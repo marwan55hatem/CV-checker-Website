@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qayem — See your CV the way a recruiter does</title>
+<script>
+  (function(){
+    var saved = localStorage.getItem('qayem_theme');
+    var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#12141C;
+    --ink-soft:#5B6169;
+    --paper:#F1F2F4;
+    --surface:#FFFFFF;
+    --line:#DEE0E3;
+    --accent:#2A5C4A;       /* strong match / pass */
+    --accent-warn:#B4562A;  /* mid range */
+    --accent-crit:#A13B3B;  /* low range / flags */
+    --accent-soft:#EEF2EF;
+    --error-bg:#FBEDEC;
+    --shadow-1:rgba(18,20,28,0.04);
+    --shadow-2:rgba(18,20,28,0.35);
+    color-scheme:light;
+  }
+  :root[data-theme="dark"]{
+    --ink:#F5F6F7;
+    --ink-soft:#ABB1B9;
+    --paper:#14161B;
+    --surface:#1C1F26;
+    --line:#333740;
+    --accent:#5CB08B;
+    --accent-warn:#E0935E;
+    --accent-crit:#E08985;
+    --accent-soft:rgba(92,176,139,0.14);
+    --error-bg:#3A2422;
+    --shadow-1:rgba(0,0,0,0.3);
+    --shadow-2:rgba(0,0,0,0.55);
+    color-scheme:dark;
+  }
+  :root[data-theme="dark"] body{
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    text-rendering:optimizeLegibility;
+  }
+  :root[data-theme="dark"] .field input[type=text]{
+    background:var(--surface); color:var(--ink);
+  }
+  body{ transition:background .2s, color .2s; }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Work Sans', sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,.brand{ font-family:'Fraunces', serif; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  a{ color:inherit; }
+  ::selection{ background:var(--ink); color:var(--paper); }
+
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:24px 32px; max-width:1080px; margin:0 auto;
+  }
+  .brand{ font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .brand .dot{ color:var(--accent); }
+  .tagline{ font-size:13px; color:var(--ink-soft); font-weight:500; }
+
+  main{ max-width:1080px; margin:0 auto; padding:8px 32px 120px; }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    display:grid; grid-template-columns:1.05fr 0.95fr; gap:64px;
+    align-items:start; padding:44px 0 24px;
+  }
+  @media (max-width:860px){ .hero{ grid-template-columns:1fr; gap:40px; } }
+
+  .hero h1{
+    font-size:clamp(32px,4.2vw,50px);
+    font-weight:600; line-height:1.12; letter-spacing:-.01em;
+    margin:0 0 20px;
+  }
+  .hero h1 .accent{ color:var(--accent); font-style:italic; }
+  .hero .lead{ color:var(--ink-soft); font-size:17px; max-width:46ch; margin:0 0 36px; }
+
+  .steps{ display:flex; flex-direction:column; gap:18px; }
+  .step{ display:flex; gap:14px; align-items:flex-start; }
+  .step .n{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:600;
+    color:var(--accent); border:1px solid var(--line); border-radius:20px;
+    padding:3px 9px; flex-shrink:0; margin-top:1px;
+  }
+  .step .t{ font-weight:600; font-size:14.5px; }
+  .step .d{ color:var(--ink-soft); font-size:13.5px; margin-top:1px; }
+
+  /* ---------- Upload card ---------- */
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:32px;
+    box-shadow:0 1px 2px var(--shadow-1), 0 18px 40px -28px var(--shadow-2);
+  }
+  .field{ margin-bottom:20px; }
+  .field label{
+    display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft);
+    letter-spacing:.02em; margin-bottom:8px; text-transform:uppercase;
+  }
+  .field input[type=text]{
+    width:100%; padding:12px 14px; font-size:15px;
+    border:1px solid var(--line); border-radius:6px;
+    background:#fff; font-family:inherit; color:var(--ink);
+    transition:border-color .15s;
+  }
+  .field input[type=text]:focus{ border-color:var(--accent); }
+
+  .drop{
+    display:block; border:1.5px dashed var(--line);
+    border-radius:8px; padding:28px 16px; text-align:center; cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.drag{ border-color:var(--accent); background:var(--accent-soft); }
+  .drop .icon{ font-size:22px; margin-bottom:8px; display:block; opacity:.7; }
+  .drop .instr{ font-size:13.5px; color:var(--ink-soft); }
+  .drop .fname{ font-size:13px; color:var(--accent); margin-top:8px; font-weight:600; }
+  .drop input{ display:none; }
+
+  button.submit{
+    margin-top:6px; width:100%; padding:15px;
+    background:var(--ink); color:var(--paper);
+    border:none; border-radius:6px; font-size:15px; font-weight:600;
+    cursor:pointer; transition:background .15s, transform .1s;
+    letter-spacing:.01em;
+  }
+  button.submit:hover{ background:var(--accent); }
+  button.submit:active{ transform:scale(.99); }
+  button.submit:disabled{ opacity:.5; cursor:not-allowed; }
+  button.submit:disabled:hover{ background:var(--ink); }
+
+  .error-msg{
+    color:var(--accent-crit); font-size:13.5px; margin-top:12px; display:none;
+    padding:10px 12px; background:var(--error-bg); border-radius:6px;
+  }
+
+  /* ---------- Processing ---------- */
+  #status-panel{ text-align:center; padding:90px 20px 60px; }
+  #status-panel .stage{ font-weight:600; font-size:16px; margin-top:22px; }
+  #status-panel .hint{ color:var(--ink-soft); font-size:13px; margin-top:6px; }
+
+  /* ---------- Gauge (signature element) ---------- */
+  .gauge-wrap{ display:flex; flex-direction:column; align-items:center; }
+  .gauge{ width:220px; height:130px; overflow:visible; }
+  .gauge .track{ fill:none; stroke:var(--line); stroke-width:10; stroke-linecap:round; }
+  .gauge .progress{
+    fill:none; stroke:var(--accent); stroke-width:10; stroke-linecap:round;
+    stroke-dasharray:282.74; stroke-dashoffset:282.74;
+    transition:stroke-dashoffset 1.1s cubic-bezier(.3,.9,.3,1), stroke 1.1s;
+  }
+  .gauge .tick{ stroke:var(--ink-soft); stroke-width:1.5; opacity:.5; }
+  .gauge .needle{
+    stroke:var(--ink); stroke-width:3; stroke-linecap:round;
+    transform-origin:100px 100px; transform:rotate(-90deg);
+    transition:transform 1.1s cubic-bezier(.3,.9,.3,1);
+  }
+  .gauge .pivot{ fill:var(--ink); }
+  .gauge-score{ font-family:'IBM Plex Mono', monospace; font-size:36px; font-weight:600; margin-top:-18px; }
+  .gauge-verdict{ font-size:13px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; color:var(--ink-soft); margin-top:2px; }
+
+  /* ---------- Report ---------- */
+  #report .gauge-block{ text-align:center; margin-bottom:48px; }
+
+  .rep-section{ margin-bottom:36px; opacity:0; animation:rise .5s ease forwards; }
+  .rep-section:nth-of-type(1){ animation-delay:.05s; }
+  .rep-section:nth-of-type(2){ animation-delay:.12s; }
+  .rep-section:nth-of-type(3){ animation-delay:.19s; }
+  .rep-section:nth-of-type(4){ animation-delay:.26s; }
+  @keyframes rise{ from{ opacity:0; transform:translateY(6px);} to{ opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion:reduce){
+    .rep-section{ animation:none; opacity:1; }
+    .gauge .progress, .gauge .needle{ transition:none; }
+  }
+
+  .rep-section h2{
+    font-size:13px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--ink-soft); display:flex; align-items:center; gap:10px; margin:0 0 16px;
+  }
+  .rep-section h2::after{ content:""; flex:1; height:1px; background:var(--line); }
+
+  .note{
+    padding:12px 14px; background:var(--surface); border:1px solid var(--line);
+    border-left:3px solid var(--accent-crit);
+    border-radius:6px; margin-bottom:10px; font-size:14px;
+  }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    padding:7px 14px; background:var(--surface); border:1px solid var(--line);
+    border-radius:20px; font-size:13.5px;
+  }
+  .card-row{ display:flex; flex-direction:column; gap:10px; }
+  .card{
+    padding:14px 16px; background:var(--surface); border:1px solid var(--line);
+    border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+  .card .t{ font-weight:600; font-size:14.5px; }
+  .card .s{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+  .card a{ font-size:13px; color:var(--accent); font-weight:600; text-decoration:none; white-space:nowrap; }
+  .card a:hover{ text-decoration:underline; }
+
+  .restart{
+    display:block; margin:52px auto 0; background:none; border:1px solid var(--line);
+    color:var(--ink-soft); padding:10px 20px; border-radius:20px; font-size:13px;
+    cursor:pointer; transition:border-color .15s, color .15s;
+  }
+  .restart:hover{ border-color:var(--accent); color:var(--accent); }
+
+  footer{ text-align:center; padding:28px; color:var(--ink-soft); font-size:12px; }
+  [hidden]{ display:none !important; }
+
+  .header-right{ display:flex; align-items:center; gap:16px; }
+  .theme-toggle{
+    display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px; border-radius:8px;
+    border:1px solid var(--line); background:var(--surface);
+    color:var(--ink-soft); cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  .theme-toggle:hover{ border-color:var(--accent); color:var(--accent); }
+  .theme-toggle svg{ width:17px; height:17px; }
+  .theme-toggle .sun{ display:none; }
+  :root[data-theme="dark"] .theme-toggle .moon{ display:none; }
+  :root[data-theme="dark"] .theme-toggle .sun{ display:block; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Qayem<span class="dot">.</span></div>
+  <div class="header-right">
+    <div class="tagline">AI-powered CV evaluation</div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" type="button">
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero" id="hero-section">
+    <div>
+      <h1>See your CV the way <span class="accent">a recruiter</span> does.</h1>
+      <p class="lead">Upload your resume and the role you're targeting. Get a match score, the specific mistakes holding you back, and a next step — courses if you're not there yet, or matching companies if you are.</p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="n">01</span>
+          <div><div class="t">Upload</div><div class="d">Your CV and target role</div></div>
+        </div>
+        <div class="step">
+          <span class="n">02</span>
+          <div><div class="t">Score</div><div class="d">AI compares you against the role</div></div>
+        </div>
+        <div class="step">
+          <span class="n">03</span>
+          <div><div class="t">Next step</div><div class="d">Courses to close the gap, or companies ready to hire you</div></div>
+        </div>
+      </div>
+    </div>
+
+    <form class="panel" id="upload-form">
+      <div class="field">
+        <label for="target-role">Target role</label>
+        <input type="text" id="target-role" placeholder="e.g. Backend Developer, AI Engineer" required>
+      </div>
+
+      <div class="field">
+        <label>Resume file (PDF or Word)</label>
+        <label class="drop" id="drop-zone">
+          <span class="icon">↑</span>
+          <span class="instr">Drop your file here, or click to browse</span>
+          <div class="fname" id="file-name"></div>
+          <input type="file" id="file-input" accept=".pdf,.doc,.docx">
+        </label>
+      </div>
+
+      <button type="submit" class="submit" id="submit-btn">Evaluate my CV</button>
+      <div class="error-msg" id="error-msg"></div>
+    </form>
+  </section>
+
+  <section id="status-panel" hidden>
+    <div class="gauge-wrap">
+      <svg class="gauge" viewBox="0 0 200 110">
+        <path class="track" d="M10,100 A90,90 0 0 1 190,100"/>
+        <line class="tick" x1="8" y1="100" x2="22" y2="100"/>
+        <line class="tick" x1="34.95" y1="34.95" x2="44.8" y2="44.8"/>
+        <line class="tick" x1="100" y1="8" x2="100" y2="22"/>
+        <line class="tick" x1="165.05" y1="34.95" x2="155.2" y2="44.8"/>
+        <line class="tick" x1="192" y1="100" x2="178" y2="100"/>
+        <line class="needle" id="scan-needle" x1="100" y1="100" x2="100" y2="28"/>
+        <circle class="pivot" cx="100" cy="100" r="4"/>
+      </svg>
+    </div>
+    <div class="stage" id="stage-text">Reading your CV…</div>
+    <div class="hint">This usually takes under a minute</div>
+  </section>
+
+  <section id="report" hidden>
+    <div class="gauge-block">
+      <svg class="gauge" viewBox="0 0 200 110">
+        <path class="track" d="M10,100 A90,90 0 0 1 190,100"/>
+        <line class="tick" x1="8" y1="100" x2="22" y2="100"/>
+        <line class="tick" x1="34.95" y1="34.95" x2="44.8" y2="44.8"/>
+        <line class="tick" x1="100" y1="8" x2="100" y2="22"/>
+        <line class="tick" x1="165.05" y1="34.95" x2="155.2" y2="44.8"/>
+        <line class="tick" x1="192" y1="100" x2="178" y2="100"/>
+        <path class="progress" id="gauge-progress" d="M10,100 A90,90 0 0 1 190,100"/>
+        <line class="needle" id="gauge-needle" x1="100" y1="100" x2="100" y2="28"/>
+        <circle class="pivot" cx="100" cy="100" r="4"/>
+      </svg>
+      <div class="gauge-score mono" id="score-pct">0%</div>
+      <div class="gauge-verdict" id="score-verdict">Match score</div>
+    </div>
+
+    <div class="rep-section" id="mistakes-section">
+      <h2>What's holding you back</h2>
+      <div id="mistakes-list"></div>
+    </div>
+
+    <div class="rep-section" id="missing-section">
+      <h2>Missing skills</h2>
+      <div class="chips" id="missing-chips"></div>
+    </div>
+
+    <div class="rep-section" id="courses-section">
+      <h2>Courses to close the gap</h2>
+      <div class="card-row" id="courses-list"></div>
+    </div>
+
+    <div class="rep-section" id="companies-section">
+      <h2>Companies hiring for this role</h2>
+      <div class="card-row" id="companies-list"></div>
+    </div>
+
+    <button class="restart" id="restart-btn">Evaluate another CV</button>
+  </section>
+
+</main>
+
+<footer>Qayem — files are processed automatically, no one reviews them manually.</footer>
+
+<script>
+/* ============================================================
+   Config — update before running
+   ============================================================ */
+const CONFIG = {
+  SUPABASE_URL: "https://oklgzvqmfxuvutgyepkp.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_JNBZYIHDSQ4IeS23KzefIg_94lAIBfK",
+  N8N_WEBHOOK_URL: "https://marwan-hatem-252004.app.n8n.cloud/webhook/cv-review",
+  BUCKET_NAME: "cvs",
+  SUBMISSIONS_TABLE: "submissions",
+  FEEDBACK_TABLE: "feedback",
+  POLL_INTERVAL_MS: 3000,
+};
+/* ============================================================ */
+
+const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+/* ---------- Theme toggle ---------- */
+const themeToggle = document.getElementById('theme-toggle');
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('qayem_theme', theme);
+}
+(function initTheme(){
+  const saved = localStorage.getItem('qayem_theme');
+  if(saved){ applyTheme(saved); return; }
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(prefersDark ? 'dark' : 'light');
+})();
+themeToggle.addEventListener('click', ()=>{
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+const heroSection = document.getElementById('hero-section');
+const statusPanel = document.getElementById('status-panel');
+const reportSection = document.getElementById('report');
+const stageText = document.getElementById('stage-text');
+const form = document.getElementById('upload-form');
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileNameEl = document.getElementById('file-name');
+const submitBtn = document.getElementById('submit-btn');
+const errorMsg = document.getElementById('error-msg');
+const restartBtn = document.getElementById('restart-btn');
+const scanNeedle = document.getElementById('scan-needle');
+
+let selectedFile = null;
+let pollTimer = null;
+let scanSweepTimer = null;
+
+['dragover','dragleave','drop'].forEach(evt=>{
+  dropZone.addEventListener(evt, e=>{
+    e.preventDefault();
+    dropZone.classList.toggle('drag', evt==='dragover');
+  });
+});
+dropZone.addEventListener('drop', e=>{
+  if(e.dataTransfer.files[0]){
+    selectedFile = e.dataTransfer.files[0];
+    fileNameEl.textContent = '✓ ' + selectedFile.name;
+    const dt = new DataTransfer();
+    dt.items.add(selectedFile);
+    fileInput.files = dt.files;
+  }
+});
+fileInput.addEventListener('change', ()=>{
+  if(fileInput.files && fileInput.files[0]){
+    selectedFile = fileInput.files[0];
+    fileNameEl.textContent = '✓ ' + selectedFile.name;
+  }
+});
+
+function showError(msg){
+  errorMsg.textContent = msg;
+  errorMsg.style.display = 'block';
+}
+function clearError(){ errorMsg.style.display = 'none'; }
+
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  clearError();
+  const targetRole = document.getElementById('target-role').value.trim();
+  if(!selectedFile){ showError('Please upload your resume file.'); return; }
+  if(!targetRole){ showError('Please enter your target role.'); return; }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Uploading…';
+
+  try{
+    const submissionId = crypto.randomUUID();
+    const ext = selectedFile.name.split('.').pop();
+    const path = `${submissionId}.${ext}`;
+
+    const { error: uploadError } = await sb.storage
+      .from(CONFIG.BUCKET_NAME)
+      .upload(path, selectedFile);
+    if(uploadError) throw uploadError;
+
+    const { error: insertError } = await sb
+      .from(CONFIG.SUBMISSIONS_TABLE)
+      .insert({
+        id: submissionId,
+        cv_file_path: path,
+        target_role: targetRole,
+        status: 'pending'
+      });
+    if(insertError) throw insertError;
+
+    await fetch(CONFIG.N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ submission_id: submissionId })
+    });
+
+    localStorage.setItem('last_submission_id', submissionId);
+    goToProcessing(submissionId);
+
+  } catch(err){
+    console.error(err);
+    showError('Something went wrong during upload. Please try again.');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Evaluate my CV';
+  }
+});
+
+function goToProcessing(submissionId){
+  heroSection.hidden = true;
+  statusPanel.hidden = false;
+  startScanSweep();
+  startPolling(submissionId);
+}
+
+// Gentle back-and-forth sweep on the needle while waiting, purely ambient
+function startScanSweep(){
+  let dir = 1, angle = -90;
+  scanSweepTimer = setInterval(()=>{
+    angle += dir * 6;
+    if(angle >= 90 || angle <= -90) dir *= -1;
+    scanNeedle.style.transform = `rotate(${angle}deg)`;
+  }, 90);
+}
+
+const STAGE_MESSAGES = [
+  'Reading your CV…',
+  'Comparing your skills to the role…',
+  'Finding your next step…'
+];
+let stageIdx = 0;
+function cycleStage(){
+  stageText.textContent = STAGE_MESSAGES[stageIdx % STAGE_MESSAGES.length];
+  stageIdx++;
+}
+
+function startPolling(submissionId){
+  cycleStage();
+  const stageTimer = setInterval(cycleStage, 4000);
+  let feedbackAttempts = 0;
+  const MAX_FEEDBACK_ATTEMPTS = 10; // ~30s of extra waiting after status flips to done
+
+  pollTimer = setInterval(async ()=>{
+    const { data, error } = await sb
+      .from(CONFIG.SUBMISSIONS_TABLE)
+      .select('status, score')
+      .eq('id', submissionId)
+      .single();
+
+    if(error){ console.error('poll error:', error); return; }
+
+    if(data.status === 'done' || data.status === 'completed'){
+      const { data: feedbackRows, error: fbError } = await sb
+        .from(CONFIG.FEEDBACK_TABLE)
+        .select('*')
+        .eq('submission_id', submissionId)
+        .limit(1);
+      const feedback = feedbackRows && feedbackRows[0];
+
+      if(fbError){
+        console.error('feedback fetch error:', fbError);
+        clearInterval(pollTimer);
+        clearInterval(stageTimer);
+        clearInterval(scanSweepTimer);
+        statusPanel.hidden = true;
+        heroSection.hidden = false;
+        showError('Your CV was analyzed, but we hit an error showing the result: ' + fbError.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Evaluate my CV';
+        return;
+      }
+
+      if(!feedback){
+        // Status is done but the feedback row hasn't landed yet — keep polling a bit longer.
+        feedbackAttempts++;
+        console.log('status is done, waiting for feedback row… attempt', feedbackAttempts);
+        if(feedbackAttempts >= MAX_FEEDBACK_ATTEMPTS){
+          clearInterval(pollTimer);
+          clearInterval(stageTimer);
+          clearInterval(scanSweepTimer);
+          statusPanel.hidden = true;
+          heroSection.hidden = false;
+          showError('Your CV was analyzed, but the detailed results are taking longer than expected. Please try again in a moment.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Evaluate my CV';
+        }
+        return;
+      }
+
+      clearInterval(pollTimer);
+      clearInterval(stageTimer);
+      clearInterval(scanSweepTimer);
+      showReport(data.score, feedback);
+    } else if(data.status === 'error'){
+      clearInterval(pollTimer);
+      clearInterval(stageTimer);
+      clearInterval(scanSweepTimer);
+      statusPanel.hidden = true;
+      heroSection.hidden = false;
+      showError('Something went wrong while analyzing your CV. Please try again.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Evaluate my CV';
+    }
+  }, CONFIG.POLL_INTERVAL_MS);
+}
+
+function setGauge(score){
+  const circumference = 282.74;
+  const clamped = Math.max(0, Math.min(100, score));
+  const offset = circumference * (1 - clamped / 100);
+  const angle = (clamped / 100) * 180 - 90;
+
+  const progress = document.getElementById('gauge-progress');
+  const needle = document.getElementById('gauge-needle');
+
+  let color = 'var(--accent-crit)';
+  let verdict = 'Significant gaps';
+  if(clamped >= 85){ color = 'var(--accent)'; verdict = 'Excellent match'; }
+  else if(clamped >= 70){ color = 'var(--accent)'; verdict = 'Strong match'; }
+  else if(clamped >= 50){ color = 'var(--accent-warn)'; verdict = 'Needs work'; }
+
+  progress.style.stroke = color;
+
+  // trigger transition on next frame
+  requestAnimationFrame(()=>{
+    progress.style.strokeDashoffset = offset;
+    needle.style.transform = `rotate(${angle}deg)`;
+  });
+
+  document.getElementById('score-pct').textContent = `${clamped}%`;
+  document.getElementById('score-verdict').textContent = verdict;
+}
+
+function showReport(score, fb){
+  statusPanel.hidden = true;
+  reportSection.hidden = false;
+
+  setGauge(score);
+
+  const mistakesList = document.getElementById('mistakes-list');
+  (fb.mistakes || []).forEach(m=>{
+    const div = document.createElement('div');
+    div.className = 'note';
+    div.textContent = m;
+    mistakesList.appendChild(div);
+  });
+  document.getElementById('mistakes-section').hidden = !(fb.mistakes||[]).length;
+
+  const chipsWrap = document.getElementById('missing-chips');
+  (fb.missing_skills || []).forEach(s=>{
+    const span = document.createElement('span');
+    span.className = 'chip';
+    span.textContent = s;
+    chipsWrap.appendChild(span);
+  });
+  document.getElementById('missing-section').hidden = !(fb.missing_skills||[]).length;
+
+  const coursesList = document.getElementById('courses-list');
+  (fb.recommended_courses || []).forEach(c=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `<div><div class="t">${c.title}</div><div class="s">${c.provider || ''}</div></div>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener">Open ↗</a>` : ''}`;
+    coursesList.appendChild(div);
+  });
+  document.getElementById('courses-section').hidden = !(fb.recommended_courses||[]).length;
+
+  const companiesList = document.getElementById('companies-list');
+  (fb.recommended_companies || []).forEach(c=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `<div><div class="t">${c.name}</div><div class="s">${c.note || ''}</div></div>${c.url ? `<a href="${c.url}" target="_blank" rel="noopener">Open ↗</a>` : ''}`;
+    companiesList.appendChild(div);
+  });
+  document.getElementById('companies-section').hidden = !(fb.recommended_companies||[]).length;
+}
+
+restartBtn.addEventListener('click', ()=>{
+  location.reload();
+});
+</script>
+</body>
+</html>
